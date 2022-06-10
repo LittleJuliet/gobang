@@ -1,12 +1,31 @@
-const canvas = document.getElementById("canvas");
-const ctx = canvas.getContext("2d");
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+
+const radio = getPixelRatio(ctx);
+canvas.width = 450 * radio;
+canvas.height = 450 * radio;
+canvas.style.width = '450px';
+canvas.style.height = '450px';
+ctx.scale(radio, radio);
+
+function getPixelRatio(context) {
+  const backingStore =
+    context.backingStorePixelRatio ||
+    context.webkitBackingStorePixelRatio ||
+    context.mozBackingStorePixelRatio ||
+    context.msBackingStorePixelRatio ||
+    context.oBackingStorePixelRatio ||
+    context.backingStorePixelRatio ||
+    1;
+  return (window.devicePixelRatio || 1) / backingStore;
+}
 
 let hasChess = []; // 二维数组,表示棋盘对应的位置是否已经下过棋 0:无棋 1:玩家棋(黑) 2:电脑棋(白)
 let isPlayer = true; // 表示当前该玩家下还是电脑下 true:玩家 false:电脑
 let done = false; // 表示已经有胜利者诞生,本局游戏结束
 let wins = []; // 三位数组[i][j][k],i和j表示棋盘坐标,k表示下该点的赢法
 let winCounts = 0; // 一共有多少种赢法
-let playerWin = []; // 一维数组,表示某种赢法下有几颗棋连着,如果为5则表示胜利
+let playerWin = []; // 一维数组,表示某种赢法下有几颗棋连着,如果为5则表示胜利,6则表示已经不可能通过这种下发获胜
 let pcWin = [];
 
 window.onload = function () {
@@ -22,13 +41,15 @@ window.onload = function () {
 function drawChessBoard() {
   ctx.beginPath();
   for (let i = 0; i < 15; i++) {
+    // 绘制横线
     ctx.moveTo(15, 15 + 30 * i);
     ctx.lineTo(435, 15 + 30 * i);
 
+    // 绘制竖线
     ctx.moveTo(15 + 30 * i, 15);
     ctx.lineTo(15 + 30 * i, 435);
   }
-  ctx.strokeStyle = "#666";
+  ctx.strokeStyle = '#666';
   ctx.stroke();
   ctx.closePath();
 
@@ -39,7 +60,7 @@ function drawChessBoard() {
   ctx.moveTo(225, 215);
   ctx.lineTo(225, 235);
   ctx.lineWidth = 2;
-  ctx.strokeStyle = "#000";
+  ctx.strokeStyle = '#000';
   ctx.stroke();
   ctx.closePath();
 }
@@ -67,7 +88,7 @@ function initWins() {
   // 初始化wins
   for (let i = 0; i < 15; i++) {
     wins[i] = [];
-    for (var j = 0; j < 15; j++) {
+    for (let j = 0; j < 15; j++) {
       wins[i][j] = [];
     }
   }
@@ -112,7 +133,7 @@ function initWins() {
     }
   }
 
-  for (var i = 0; i <= winCounts; i++) {
+  for (let i = 0; i <= winCounts; i++) {
     // 在每种赢法上的初始值为0,也就是这种赢法下有几个棋相连
     playerWin[i] = 0;
     pcWin[i] = 0;
@@ -125,22 +146,23 @@ function initWins() {
 function oneStep(i, j, player) {
   ctx.beginPath();
   // 通过位置得到棋对应的坐标 棋大小设置为13px
-  ctx.arc(30 * i + 15, 30 * j + 15, 13, 0, Math.PI * 2);
+  ctx.arc(15 + 30 * i, 15 + 30 * j, 13, 0, Math.PI * 2);
+  // 给棋子设置一个圆形渐变色 开始圆->结束圆
   const gradient = ctx.createRadialGradient(
-    30 * i + 15,
-    30 * j + 15,
+    15 + 30 * i,
+    15 + 30 * j,
     13,
-    30 * i + 15,
-    30 * j + 15,
+    15 + 30 * i,
+    15 + 30 * j,
     0
   );
   // 玩家执黑棋,电脑执白棋
   if (player) {
-    gradient.addColorStop(0, "#0a0a0a");
-    gradient.addColorStop(1, "#636766");
+    gradient.addColorStop(0, '#0a0a0a');
+    gradient.addColorStop(1, '#636766');
   } else {
-    gradient.addColorStop(0, "#b1b1b1");
-    gradient.addColorStop(1, "#f9f9f9");
+    gradient.addColorStop(0, '#b1b1b1');
+    gradient.addColorStop(1, '#f9f9f9');
   }
   ctx.fillStyle = gradient;
   ctx.fill();
@@ -148,9 +170,10 @@ function oneStep(i, j, player) {
 }
 
 // 玩家下棋
-canvas.addEventListener("click", function (e) {
-  // 已经结束或者当前由电脑下棋则拦截事件
+canvas.addEventListener('click', function (e) {
+  // 已经结束
   if (done) return;
+  // 当前由电脑下棋
   if (!isPlayer) return;
   // 通过点击的坐标计算得到落子的位置
   const x = e.offsetX;
@@ -161,23 +184,30 @@ canvas.addEventListener("click", function (e) {
 
   // 如果此点还未有棋
   if (hasChess[i][j] == 0) {
+    // 落子
     oneStep(i, j, true);
+    // 记录棋子
     hasChess[i][j] = 1;
 
+    // 便利该点的所有胜利情况
     for (let k = 0; k <= winCounts; k++) {
       // 如果该点有赢的可能性
       if (wins[i][j][k]) {
         playerWin[k]++; // 该点这种赢法下的棋加1
-        pcWin[k] = 50; // 设置电脑在此点不可能胜利
-        // 如果此种赢法下有5个棋相连
+        pcWin[k] = 6; // 设置电脑在此点不可能胜利
+        // 如果此种赢法下玩家有5个棋子相连
         if (playerWin[k] == 5) {
-          alert("恭喜你，你赢了！");
+          setTimeout(() => {
+            alert('恭喜你，你赢了！');
+          }, 0);
+          // 胜利者诞生,游戏结束
           done = true;
           break;
         }
       }
     }
     if (!done) {
+      // 如果未结束,则轮到电脑下棋
       isPlayer = !isPlayer;
       pcClick();
     }
@@ -186,15 +216,15 @@ canvas.addEventListener("click", function (e) {
 
 // 电脑落子
 function pcClick() {
-  // 在每个位置落子的价值
-  let playerScore = [];
-  let pcScore = [];
-  let maxScore = 0;
+  // 在每个位置落子的权重
+  let playerScore = []; // 玩家的权重
+  let pcScore = []; // 电脑的权重
+  let maxScore = 0; // 最大权重
   // 落点坐标
   let u = 0;
   let v = 0;
 
-  // 初始化每个点落子的价值
+  // 初始化每个点落子的权重
   for (let i = 0; i < 15; i++) {
     playerScore[i] = [];
     pcScore[i] = [];
@@ -220,8 +250,8 @@ function pcClick() {
               // 如果该赢法下已有2颗棋,则加400分
               playerScore[i][j] += 400;
             } else if (playerWin[k] == 3) {
-              // 如果该赢法下已有3颗棋,则加1000分
-              playerScore[i][j] += 1000;
+              // 如果该赢法下已有3颗棋,则加2000分
+              playerScore[i][j] += 2000;
             } else if (playerWin[k] == 4) {
               // 如果该赢法下已有4颗棋,则加10000分
               playerScore[i][j] += 10000;
@@ -235,8 +265,8 @@ function pcClick() {
               // 如果电脑在该赢法下已有2颗棋,则加420分
               pcScore[i][j] += 420;
             } else if (pcWin[k] == 3) {
-              // 如果电脑在该赢法下已有3颗棋,则加1100分
-              pcScore[i][j] += 1100;
+              // 如果电脑在该赢法下已有3颗棋,则加2100分
+              pcScore[i][j] += 2100;
             } else if (pcWin[k] == 4) {
               // 如果电脑在该赢法下已有4颗棋,则加20000分
               pcScore[i][j] += 20000;
@@ -244,26 +274,26 @@ function pcClick() {
           }
         }
 
-        // 如果玩家下此点的价值比最大值大,则电脑下此点
+        // 如果玩家下此点的权重比最大值大,则电脑下此点
         if (playerScore[i][j] > maxScore) {
           maxScore = playerScore[i][j];
           u = i;
           v = j;
         } else if (playerScore[i][j] == maxScore) {
-          // 如果玩家下此点的价值与最大值相同,且电脑下此点比下前一点的价值大,则电脑下此点
+          // 如果玩家下此点的权重与最大值相同,且电脑下此点比下前一点的权重大,则电脑下此点（优先考虑自己胜利）
           if (pcScore[i][j] > pcScore[u][v]) {
             u = i;
             v = j;
           }
         }
 
-        // 如果电脑下此点的价值比最大值大,则电脑下此点
+        // 如果电脑下此点的权重比最大值大,则电脑下此点
         if (pcScore[i][j] > maxScore) {
           maxScore = pcScore[i][j];
           u = i;
           v = j;
         } else if (pcScore[i][j] == maxScore) {
-          // 如果电脑下此点的价值与最大值相同,且玩家下此点比下前一点的价值大,则电脑下此点
+          // 如果电脑下此点的权重与最大值相同,且玩家下此点比下前一点的权重大,则电脑下此点（阻碍玩家胜利）
           if (playerScore[i][j] > playerScore[u][v]) {
             u = i;
             v = j;
@@ -273,7 +303,7 @@ function pcClick() {
     }
   }
 
-  // u,v就是电脑落子最大价值的位置
+  // u,v就是电脑落子最大权重的位置
   oneStep(u, v, false);
   hasChess[u][v] = 2;
 
@@ -281,9 +311,11 @@ function pcClick() {
     // 如果该点有赢的可能性
     if (wins[u][v][k]) {
       pcWin[k]++; // 该点这种赢法下的棋加1
-      playerWin[k] = 60; // 设置玩家在此点不可能胜利
+      playerWin[k] = 6; // 设置玩家在此点不可能胜利
       if (pcWin[k] == 5) {
-        alert("很遗憾，电脑赢！");
+        setTimeout(() => {
+          alert('很遗憾，电脑赢！');
+        }, 0);
         done = true;
         break;
       }
